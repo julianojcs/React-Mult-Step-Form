@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Box, Button, Card, CardContent, Step, StepLabel, Stepper } from '@material-ui/core';
+import { Box, Button, Card, CardContent, CircularProgress, Grid, Step, StepLabel, Stepper } from '@material-ui/core';
 import { Field, Form, Formik, FormikConfig, FormikValues } from 'formik';
 import { CheckboxWithLabel, TextField } from 'formik-material-ui';
 import { mixed, number, object } from 'yup';
+
+const sleep = (time) => new Promise((accepted) => setTimeout(accepted, time))
 
 export default function Home() {
   return (
@@ -16,7 +18,10 @@ export default function Home() {
             money: 0,
             description: '',
           }}
-          onSubmit={() => {}}
+          onSubmit={async (values) => {
+            await sleep(3000)
+            console.log('values: ', values);
+          }}
         >
           <FormikStep label="Personal Informations">
             <Box paddingBottom={2}>
@@ -59,12 +64,17 @@ export interface FormikStepProps extends Pick<FormikConfig<FormikValues>, 'child
 }
 
 export function FormikStep({children}: FormikStepProps) {
-  return <>{children}</>
+  return (
+    <>
+      {children}
+    </>
+  )
 }
 
 export function FormikStepper({ children, ...props }: FormikConfig<FormikValues>) {
   const childrenArray = React.Children.toArray(children) as React.ReactElement<FormikStepProps>[];
   const [step, setStep] = useState(0)
+  const [completed, setCompleted] = useState(false)
   const currentChild = childrenArray[step] as React.ReactElement<FormikStepProps>
   // console.log('children', currentChild);
 
@@ -75,8 +85,21 @@ export function FormikStepper({ children, ...props }: FormikConfig<FormikValues>
   const handleSubmit = async (values, helpers) => {
     if ( isLastStep() ) {
       await props.onSubmit(values, helpers)
+      setCompleted(true)
+      // //Clear the form
+      // helpers.resetForm() 
+      // //Reset Steps
+      // setStep(0)
     } else {
-      setStep(step+1)
+      // setStep(step+1)
+      setStep((s) => s + 1)
+      // If you have multiple fields on the same step
+      // we will see they show the validation error all at the same time after the first step!
+      //
+      // If you want to keep that behaviour, then, comment the next line :)
+      // If you want the second/third/fourth/etc steps with the same behaviour
+      //    as the first step regarding validation errors, then the next line is for you! =)      
+      helpers.setTouched({});
     }
   }
 
@@ -86,20 +109,29 @@ export function FormikStepper({ children, ...props }: FormikConfig<FormikValues>
       validationSchema={currentChild.props.validationSchema}
       onSubmit={(values, helpers) => handleSubmit(values, helpers)}>
 
-      <Form autoComplete="off">
-        <Stepper alternativeLabel activeStep={step}>
-          {childrenArray.map((child) => (
-            <Step key={child.props.label}>
-              <StepLabel>{child.props.label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-        
-        {currentChild}
-        
-        {step > 0 ? (<Button variant="contained" color="primary" onClick={() => setStep(step-1)}>Back</Button>) : null}
-        <Button variant="contained" color="primary" type="submit">{isLastStep() ? 'Submit' : 'Next'}</Button>
-      </Form>
+      {({ isSubmitting }) => (
+        <Form autoComplete="off">
+          <Stepper alternativeLabel activeStep={step}>
+            {childrenArray.map((child, index) => (
+              <Step key={child.props.label} completed={step > index || completed}>
+                <StepLabel>{child.props.label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+          
+          {currentChild}
+          <Grid container spacing={2}>
+          {(step > 0 && !completed) ? (
+            <Grid item>
+              <Button disabled={isSubmitting || completed} variant="contained" color="primary" onClick={() => setStep(step-1)}>Back</Button>
+            </Grid>
+          ) : null}
+            <Grid item>
+              <Button startIcon={isSubmitting ? <CircularProgress size="1rem" /> : null} disabled={isSubmitting || completed} variant="contained" color="primary" type="submit">{isSubmitting ? 'Submitting...' : (isLastStep() ? (completed? 'Submited' : 'Submit' ) : 'Next')}</Button>
+            </Grid>
+          </Grid>
+        </Form>
+      )}
     </Formik>
   )
 }
